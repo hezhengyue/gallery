@@ -17,11 +17,15 @@ export default function Lightbox({
   const [position, setPosition] = useState({ x: 0, y: 0 })
   const [isDragging, setIsDragging] = useState(false)
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 })
-  const [opacity, setOpacity] = useState(1)
+  
+  // 🔥 修复：使用两个状态分别控制当前图和下一张图
+  const [nextImageIndex, setNextImageIndex] = useState<number | null>(null)
+  const [isTransitioning, setIsTransitioning] = useState(false)
+  
   const containerRef = useRef<HTMLDivElement>(null)
   const preloadCache = useRef<Set<string>>(new Set())
 
-  // 🔥 预加载前后 3 张图片
+  // 预加载图片
   const preloadImages = useCallback((idx: number) => {
     for (let i = -3; i <= 3; i++) {
       const target = (idx + i + images.length) % images.length
@@ -36,25 +40,32 @@ export default function Lightbox({
 
   useEffect(() => { preloadImages(currentIndex) }, [currentIndex, preloadImages])
 
-  // 🔥 切换逻辑（修复点击无效问题）
+  // 🔥 修复：切换逻辑 - 不再降低 opacity
   const nav = useCallback((dir: number) => {
-    setOpacity(0.3) // 快速变暗过渡，避免黑屏感
+    const next = (currentIndex + dir + images.length) % images.length
+    
+    // 🔥 关键：直接切换，不改变透明度
+    setIsTransitioning(true)
+    setNextImageIndex(next)
     setScale(1)
     setPosition({ x: 0, y: 0 })
-    const next = (currentIndex + dir + images.length) % images.length
-    // ⚠️ 关键：必须通知父组件更新索引
+    
+    // 通知父组件更新索引
     window.dispatchEvent(new CustomEvent('lightbox-change', { detail: next }))
+    
+    // 短暂延迟后重置过渡状态
+    setTimeout(() => {
+      setIsTransitioning(false)
+      setNextImageIndex(null)
+    }, 200)
   }, [currentIndex, images.length])
-
-  // 图片加载完成后恢复不透明度
-  const handleImageLoad = () => setOpacity(1)
 
   // 缩放控制
   const zoomIn = () => setScale(p => Math.min(p * 1.25, 4))
   const zoomOut = () => setScale(p => Math.max(p / 1.25, 0.25))
   const resetZoom = () => { setScale(1); setPosition({ x: 0, y: 0 }) }
 
-  // 🔥 拖拽功能
+  // 拖拽功能
   const handleMouseDown = (e: React.MouseEvent) => {
     if (scale <= 1) return
     setIsDragging(true)
@@ -159,17 +170,16 @@ export default function Lightbox({
         className="relative w-full h-full flex items-center justify-center overflow-hidden"
         onClick={e => e.stopPropagation()}
       >
-        {/* 图片容器（带平滑过渡） */}
+        {/* 🔥 修复：图片容器 - 保持 100% 不透明度 */}
         <div
-          className="relative w-full h-full flex items-center justify-center transition-opacity duration-200"
-          style={{
-            opacity,
-            cursor: scale > 1 ? (isDragging ? 'grabbing' : 'grab') : 'default',
-            transform: `scale(${scale}) translate(${position.x / scale}px, ${position.y / scale}px)`,
-            transition: isDragging ? 'none' : 'transform 0.15s ease-out, opacity 0.2s ease'
-          }}
+          className="relative w-full h-full flex items-center justify-center"
           onMouseDown={handleMouseDown}
           onTouchStart={handleTouchStart}
+          style={{
+            cursor: scale > 1 ? (isDragging ? 'grabbing' : 'grab') : 'default',
+            transform: `scale(${scale}) translate(${position.x / scale}px, ${position.y / scale}px)`,
+            transition: isDragging ? 'none' : 'transform 0.15s ease-out'
+          }}
         >
           <Image
             src={img.src}
@@ -179,7 +189,7 @@ export default function Lightbox({
             className="max-h-[85vh] w-auto object-contain rounded-lg shadow-2xl select-none"
             priority
             draggable={false}
-            onLoad={handleImageLoad}
+            unoptimized={true}
           />
         </div>
 

@@ -137,7 +137,9 @@ export default function Gallery({ images }: { images: ImageItem[] }) {
                 height={800}
                 sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
                 className="w-full h-auto object-cover transition-transform duration-500 group-hover:scale-105"
-                // 🔥 首屏优化：只给前 8 张加 priority
+                // 🔥 方案 1B 核心：禁用优化
+                unoptimized={true}
+                // 保留原有的加载优化
                 priority={idx < 8}
                 loading={idx < 8 ? 'eager' : 'lazy'}
               />

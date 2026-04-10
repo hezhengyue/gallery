@@ -1,5 +1,20 @@
 import Gallery from '@/components/Gallery'
 import { loadImages } from '@/lib/image-loader'
+import { Metadata } from 'next'  // 👈 导入 Metadata 类型
+
+// 🔥 导出 metadata 对象（服务端执行）
+export const metadata: Metadata = {
+  title: '正月画廊',
+  description: '浏览精选摄影作品，支持分类筛选和沉浸式预览',
+  keywords: ['摄影', '作品集', '画廊', '图片展示'],
+  authors: [{ name: '正月' }],
+  openGraph: {
+    title: '我的作品集 | Gallery',
+    description: '浏览精选摄影作品',
+    type: 'website',
+    locale: 'zh_CN',
+  },
+}
 
 export default function Home() {
   const images = loadImages() // 服务端执行，客户端无感知
