@@ -8,6 +8,13 @@ import type { ImageItem } from '@/lib/image-loader'
 const ITEMS_PER_PAGE = 12
 const PRELOAD_THRESHOLD = 200
 
+// 1. 辅助函数：格式化标题，自动过滤 undefined
+const formatTitle = (category: ImageItem['category']) => {
+  return [category.l1, category.l2, category.l3]
+    .filter(Boolean) // 过滤掉 undefined, null, 空字符串
+    .join(' - ')
+}
+
 export default function Gallery({ images }: { images: ImageItem[] }) {
   const [selected, setSelected] = useState<ImageItem | null>(null)
   const [lightboxIdx, setLightboxIdx] = useState(0)
@@ -18,18 +25,23 @@ export default function Gallery({ images }: { images: ImageItem[] }) {
   const observerTarget = useRef<HTMLDivElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
 
-  // 过滤逻辑
-  const filtered = images.filter(img => 
+  // 2. 数据过滤 + 标题清洗
+  const rawFiltered = images.filter(img => 
     (filters.l1 === '全部' || img.category.l1 === filters.l1) &&
     (filters.l2 === '全部' || img.category.l2 === filters.l2) &&
     (filters.l3 === '全部' || img.category.l3 === filters.l3)
   )
 
+  const filtered = rawFiltered.map(img => ({
+    ...img,
+    title: formatTitle(img.category)
+  }))
+
   useEffect(() => {
     setVisibleCount(ITEMS_PER_PAGE)
   }, [filters])
 
-  // 无限滚动观察器
+  // 3. 无限滚动
   useEffect(() => {
     const observer = new IntersectionObserver(
       (entries) => {
@@ -44,14 +56,11 @@ export default function Gallery({ images }: { images: ImageItem[] }) {
       { root: containerRef.current, rootMargin: `${PRELOAD_THRESHOLD}px` }
     )
 
-    if (observerTarget.current) {
-      observer.observe(observerTarget.current)
-    }
-
+    if (observerTarget.current) observer.observe(observerTarget.current)
     return () => observer.disconnect()
   }, [filtered.length, isLoading])
 
-  // 生成选项：过滤掉 undefined/null/空字符串
+  // 4. 获取筛选选项（依然保持过滤 undefined 的逻辑）
   const getOptions = (level: 1|2|3, data = filtered) => {
     let rawValues: (string | undefined | null)[] = []
 
@@ -70,9 +79,7 @@ export default function Gallery({ images }: { images: ImageItem[] }) {
         .map(i => i.category.l3)
     }
 
-    // 去重并过滤掉无效值
     const uniqueValidValues = Array.from(new Set(rawValues)).filter((val): val is string => !!val)
-    
     return ['全部', ...uniqueValidValues]
   }
 
@@ -90,6 +97,7 @@ export default function Gallery({ images }: { images: ImageItem[] }) {
   const setFilter = (level: 1|2|3, value: string) => {
     setFilters(prev => {
       const next = { ...prev, [`l${level}`]: value }
+      // 级联重置：选 L1 重置 L2/L3，选 L2 重置 L3
       if (level === 1) { next.l2 = '全部'; next.l3 = '全部' }
       if (level === 2) next.l3 = '全部'
       return next
@@ -100,16 +108,16 @@ export default function Gallery({ images }: { images: ImageItem[] }) {
 
   return (
     <>
-      {/* 筛选器 */}
       <div className="mb-6 space-y-2">
         {[1, 2, 3].map(level => {
           const options = getOptions(level as 1|2|3)
           const value = filters[`l${level}` as keyof typeof filters]
           
-          // 🔥 修改：移除了 "L1为全部时隐藏下级" 的限制
-          // 现在即使 L1 是全部，只要数据里有 L2，就会显示 L2 筛选栏
+          // 🔥 恢复级联逻辑：
+          // 1. 如果上一级选的是"全部"，则隐藏当前级（L1选全部，隐藏L2；L2选全部，隐藏L3）
+          if (level > 1 && filters[`l${level-1}` as keyof typeof filters] === '全部') return null
           
-          // 如果当前级没有有效选项（只有"全部"），则不渲染该行
+          // 2. 如果当前级没有有效选项（只有"全部"），也不显示
           if (options.length <= 1) return null
 
           return (
@@ -131,13 +139,13 @@ export default function Gallery({ images }: { images: ImageItem[] }) {
             </div>
           )
         })}
+        
         <div className="text-sm text-gray-500 pt-1">
           显示 <span className="font-semibold text-blue-600">{visibleImages.length}</span> / {filtered.length}
           {visibleCount < filtered.length && ` (已加载 ${visibleCount})`}
         </div>
       </div>
 
-      {/* 瀑布流容器 */}
       <div ref={containerRef} className="columns-1 sm:columns-2 md:columns-3 lg:columns-4 gap-4 space-y-4 min-h-[400px]">
         {visibleImages.map((img, idx) => (
           <div
@@ -159,12 +167,9 @@ export default function Gallery({ images }: { images: ImageItem[] }) {
               />
               <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors" />
             </div>
-            
-            {/* 🔥 修复：动态重新拼接标题，自动过滤掉 undefined */}
+            {/* 显示清洗后的标题 */}
             <p className="mt-2 text-sm font-medium text-gray-800 dark:text-gray-100 line-clamp-2">
-              {[img.category.l1, img.category.l2, img.category.l3]
-                .filter(Boolean) // 过滤掉 undefined, null, ""
-                .join(' - ')}
+              {img.title}
             </p>
           </div>
         ))}
