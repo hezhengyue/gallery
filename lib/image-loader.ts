@@ -1,3 +1,4 @@
+// lib/image-loader.ts
 import fs from 'fs'
 import path from 'path'
 import { CATEGORIES } from '@/config/gallery-config'

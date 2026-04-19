@@ -1,3 +1,4 @@
+// app/page.tsx
 import Gallery from '@/components/Gallery'
 import { loadImages } from '@/lib/image-loader'
 import { Metadata } from 'next'  // 👈 导入 Metadata 类型

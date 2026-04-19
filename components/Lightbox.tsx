@@ -1,3 +1,4 @@
+// components/Lightbox.tsx
 'use client'
 import { useEffect, useState, useCallback, useRef } from 'react'
 import Image from 'next/image'
